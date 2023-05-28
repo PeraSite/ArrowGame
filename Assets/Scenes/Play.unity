@@ -321,6 +321,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _unityInputProvider: {fileID: 2023306483}
+  _replicatedCharacterPrefab: {fileID: 4005599223105419099, guid: 3d986ff79d8c4994c937f51ac9e00cab, type: 3}
+  _spawnLocation: {x: 0, y: -3.86}
 --- !u!4 &557511484
 Transform:
   m_ObjectHideFlags: 0
@@ -415,7 +417,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2023306479}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.16, y: -3.86, z: 0}
+  m_LocalPosition: {x: 0, y: -3.86, z: 0}
   m_LocalScale: {x: 0.6752, y: 0.6752, z: 0.6752}
   m_ConstrainProportionsScale: 0
   m_Children: []

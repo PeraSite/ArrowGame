@@ -3,10 +3,10 @@ using UnityEngine;
 
 namespace ArrowGame.Client {
 	public class NetworkInputProvider : MonoBehaviour, IInputProvider {
-		[SerializeField] private int _playerID;
+		public InputState LastReceivedState;
 
 		public InputState GetState() {
-			throw new System.NotImplementedException();
+			return LastReceivedState;
 		}
 	}
 }

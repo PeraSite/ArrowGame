@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
@@ -12,31 +13,42 @@ using UnityEngine;
 
 namespace ArrowGame.Client {
 	public class NetworkManager : MonoBehaviour {
-		[SerializeField] private UnityInputProvider _unityInputProvider;
-
 		public static NetworkManager Instance { get; private set; }
-
 		public event Action<IPacket> OnPacketReceived;
+
+		// TCP 통신 오브젝트
 		private TcpClient _client;
 		private NetworkStream _stream;
 		private BinaryReader _reader;
 		private BinaryWriter _writer;
 		private ConcurrentQueue<IPacket> _packetQueue;
+
+		// 입력 관련
+		[SerializeField] private UnityInputProvider _unityInputProvider;
 		private InputState _lastState;
 
+		// 서버에서 부여받은 플레이어 ID
 		private int _localPlayerID;
 
-		private void Awake() {
-			_client = new TcpClient();
-			_packetQueue = new ConcurrentQueue<IPacket>();
+		// Replication 관련
+		[SerializeField] private GameObject _replicatedCharacterPrefab;
+		[SerializeField] private Vector2 _spawnLocation;
+		private Dictionary<int, GameObject> _replicatedCharacters;
 
+#region Unity Lifecycle
+		private void Awake() {
+			// Singleton 로직
 			if (Instance != null && Instance != this) {
 				Destroy(gameObject);
 				return;
 			}
-
 			Instance = this;
 			DontDestroyOnLoad(gameObject);
+
+			// 변수 초기화
+			_client = new TcpClient();
+			_packetQueue = new ConcurrentQueue<IPacket>();
+			_replicatedCharacters = new Dictionary<int, GameObject>();
 
 			// Not received by server
 			_localPlayerID = -1;
@@ -44,6 +56,20 @@ namespace ArrowGame.Client {
 			JoinServer();
 		}
 
+		private void OnDestroy() {
+			_client?.Dispose();
+			_stream?.Dispose();
+			_reader?.Dispose();
+			_writer?.Dispose();
+		}
+
+		[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+		private static void ResetStatic() {
+			Instance = null;
+		}
+#endregion
+
+#region Ticking Logic
 		private void Update() {
 			CheckPlayerInput();
 
@@ -52,6 +78,23 @@ namespace ArrowGame.Client {
 				HandlePacket(incomingPacket);
 			}
 		}
+
+		private void CheckPlayerInput() {
+			var currentState = _unityInputProvider.GetState();
+
+			if (!currentState.Equals(_lastState)) {
+				SendInputState(currentState);
+			}
+
+			_lastState = currentState;
+		}
+
+		private void SendInputState(InputState state) {
+			if (_localPlayerID == -1) return;
+
+			SendPacket(new PlayerInputPacket(_localPlayerID, state));
+		}
+  #endregion
 
 		private void JoinServer() {
 			if (_client.Connected) {
@@ -105,11 +148,6 @@ namespace ArrowGame.Client {
 			_writer.Write(packet);
 		}
 
-		[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-		private static void ResetStatic() {
-			Instance = null;
-		}
-
 		private void HandlePacket(IPacket incomingPacket) {
 			OnPacketReceived?.Invoke(incomingPacket);
 			switch (incomingPacket) {
@@ -119,26 +157,25 @@ namespace ArrowGame.Client {
 				}
 
 				case PlayerInputPacket packet: {
+					if (packet.PlayerId == _localPlayerID) return;
 
+					NetworkInputProvider networkInputProvider;
+
+
+					if (_replicatedCharacters.TryGetValue(packet.PlayerId, out GameObject go)) {
+						// 이미 존재하는 플레이어 ID의 패킷을 받았을 때
+						networkInputProvider = go.GetComponent<NetworkInputProvider>();
+					} else {
+						// 새로운 플레이어 ID의 패킷을 받았을 때
+						var instantiated = Instantiate(_replicatedCharacterPrefab, _spawnLocation, Quaternion.identity);
+						_replicatedCharacters.Add(packet.PlayerId, instantiated);
+						networkInputProvider = instantiated.GetComponent<NetworkInputProvider>();
+					}
+
+					networkInputProvider.LastReceivedState = packet.State;
 					break;
 				}
 			}
-		}
-
-		private void CheckPlayerInput() {
-			var currentState = _unityInputProvider.GetState();
-
-			if (!currentState.Equals(_lastState)) {
-				SendInputState(currentState);
-			}
-
-			_lastState = currentState;
-		}
-
-		private void SendInputState(InputState state) {
-			if (_localPlayerID == -1) return;
-
-			SendPacket(new PlayerInputPacket(_localPlayerID, state));
 		}
 	}
 }
