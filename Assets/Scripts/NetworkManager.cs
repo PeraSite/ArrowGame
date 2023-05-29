@@ -31,6 +31,7 @@ namespace ArrowGame.Client {
 		private const int NOT_ASSIGNED_ID = -999;
 		private int _localPlayerID;
 		[SerializeField] private PlayerIdDisplay _localIdDisplay;
+		public RoomState RoomState { get; private set; }
 
 		[Header("타 플레이어")]
 		[SerializeField] private GameObject _replicatedCharacterPrefab;
@@ -53,6 +54,7 @@ namespace ArrowGame.Client {
 			_replicatedCharacters = new Dictionary<int, GameObject>();
 
 			_localPlayerID = NOT_ASSIGNED_ID;
+			RoomState = RoomState.Waiting;
 
 			JoinServer();
 		}
@@ -184,6 +186,11 @@ namespace ArrowGame.Client {
 						Debug.LogError($"존재하지 않는 플레이어 ID {packet.PlayerId} 의 패킷을 받았습니다!");
 					}
 
+					break;
+				}
+
+				case ServerRoomStatusPacket packet: {
+					RoomState = packet.State;
 					break;
 				}
 
