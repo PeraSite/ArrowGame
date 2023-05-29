@@ -162,9 +162,6 @@ namespace ArrowGame.Client {
 				}
 
 				case ServerRoomJoinPacket packet: {
-					// 자신의 ID가 아직 할당 전이라면 무시
-					if (_localPlayerID == NOT_ASSIGNED_ID) return;
-
 					// 자신의 아이디와 같은 패킷이라면 무시
 					if (_localPlayerID == packet.PlayerId) return;
 
