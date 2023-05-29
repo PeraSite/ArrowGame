@@ -24,13 +24,15 @@ namespace ArrowGame.Client {
 		private ConcurrentQueue<IPacket> _packetQueue;
 
 		// 입력 관련
-		[SerializeField] private UnityInputProvider _unityInputProvider;
+		[Header("로컬 플레이어")]
+		[SerializeField] private UnityInputProvider _localInputProvider;
 		private InputState _lastState;
 
-		// 서버에서 부여받은 플레이어 ID
+		private const int NOT_ASSIGNED_ID = -999;
 		private int _localPlayerID;
+		[SerializeField] private PlayerIdDisplay _localIdDisplay;
 
-		// Replication 관련
+		[Header("타 플레이어")]
 		[SerializeField] private GameObject _replicatedCharacterPrefab;
 		[SerializeField] private Vector2 _spawnLocation;
 		private Dictionary<int, GameObject> _replicatedCharacters;
@@ -50,8 +52,7 @@ namespace ArrowGame.Client {
 			_packetQueue = new ConcurrentQueue<IPacket>();
 			_replicatedCharacters = new Dictionary<int, GameObject>();
 
-			// Not received by server
-			_localPlayerID = -1;
+			_localPlayerID = NOT_ASSIGNED_ID;
 
 			JoinServer();
 		}
@@ -80,7 +81,7 @@ namespace ArrowGame.Client {
 		}
 
 		private void CheckPlayerInput() {
-			var currentState = _unityInputProvider.GetState();
+			var currentState = _localInputProvider.GetState();
 
 			if (!currentState.Equals(_lastState)) {
 				SendInputState(currentState);
@@ -151,28 +152,53 @@ namespace ArrowGame.Client {
 		private void HandlePacket(IPacket incomingPacket) {
 			OnPacketReceived?.Invoke(incomingPacket);
 			switch (incomingPacket) {
-				case ServerPongPacket packet: {
+				case ServerAssignPlayerIdPacket packet: {
+					// 전달받은 Player ID 할당
 					_localPlayerID = packet.PlayerId;
+					_localIdDisplay.Init(_localPlayerID);
+					break;
+				}
+
+				case ServerRoomJoinPacket packet: {
+					// 자신의 ID가 아직 할당 전이라면 무시
+					if (_localPlayerID == NOT_ASSIGNED_ID) return;
+
+					// 자신의 아이디와 같은 패킷이라면 무시
+					if (_localPlayerID == packet.PlayerId) return;
+
+					var instantiated = Instantiate(_replicatedCharacterPrefab, _spawnLocation, Quaternion.identity);
+					_replicatedCharacters.Add(packet.PlayerId, instantiated);
+					instantiated.GetComponent<PlayerIdDisplay>().Init(packet.PlayerId);
+					break;
+				}
+
+				case ServerRoomQuitPacket packet: {
+					// 자신의 아이디와 같은 패킷이라면 무시
+					if (_localPlayerID == packet.PlayerId) return;
+
+					if (_replicatedCharacters.TryGetValue(packet.PlayerId, out GameObject go)) {
+						// 이미 존재하는 플레이어 ID의 패킷을 받았을 때
+						Destroy(go);
+						_replicatedCharacters.Remove(packet.PlayerId);
+					} else {
+						Debug.LogError($"존재하지 않는 플레이어 ID {packet.PlayerId} 의 패킷을 받았습니다!");
+					}
+
 					break;
 				}
 
 				case PlayerInputPacket packet: {
+					// 자신의 아이디와 같은 패킷이라면 무시
 					if (packet.PlayerId == _localPlayerID) return;
-
-					NetworkInputProvider networkInputProvider;
-
 
 					if (_replicatedCharacters.TryGetValue(packet.PlayerId, out GameObject go)) {
 						// 이미 존재하는 플레이어 ID의 패킷을 받았을 때
-						networkInputProvider = go.GetComponent<NetworkInputProvider>();
+						var networkInputProvider = go.GetComponent<NetworkInputProvider>();
+						networkInputProvider.LastReceivedState = packet.State;
 					} else {
-						// 새로운 플레이어 ID의 패킷을 받았을 때
-						var instantiated = Instantiate(_replicatedCharacterPrefab, _spawnLocation, Quaternion.identity);
-						_replicatedCharacters.Add(packet.PlayerId, instantiated);
-						networkInputProvider = instantiated.GetComponent<NetworkInputProvider>();
+						Debug.LogError($"존재하지 않는 플레이어 ID {packet.PlayerId} 의 패킷을 받았습니다!");
 					}
 
-					networkInputProvider.LastReceivedState = packet.State;
 					break;
 				}
 			}
