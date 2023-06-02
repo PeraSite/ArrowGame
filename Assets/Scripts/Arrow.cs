@@ -22,7 +22,7 @@ namespace ArrowGame.Client {
 		private void OnTriggerEnter2D(Collider2D other) {
 			if (other.CompareTag("Player")) {
 				Destroy(gameObject);
-				// TODO: 플레이어에게 데미지를 입히는 로직을 구현
+				NetworkManager.Instance.HitByArrow();
 			}
 		}
 	}

@@ -23,15 +23,15 @@ namespace ArrowGame.Client {
 		private BinaryWriter _writer;
 		private ConcurrentQueue<IPacket> _packetQueue;
 
-		// 입력 관련
+		public RoomState RoomState { get; private set; }
+
 		[Header("로컬 플레이어")]
 		[SerializeField] private UnityInputProvider _localInputProvider;
+		[SerializeField] private HealthDisplay _localHealthDisplay;
+		[SerializeField] private PlayerIdDisplay _localIdDisplay;
 		private InputState _lastState;
-
 		private const int NOT_ASSIGNED_ID = -999;
 		private int _localPlayerID;
-		[SerializeField] private PlayerIdDisplay _localIdDisplay;
-		public RoomState RoomState { get; private set; }
 
 		[Header("타 플레이어")]
 		[SerializeField] private GameObject _replicatedCharacterPrefab;
@@ -192,6 +192,20 @@ namespace ArrowGame.Client {
 
 				case ServerRoomStatusPacket packet: {
 					RoomState = packet.State;
+
+					if (_localPlayerID == NOT_ASSIGNED_ID) break;
+
+					foreach (var (id, hp) in packet.PlayerHp) {
+						if (id == _localPlayerID) {
+							_localHealthDisplay.SetHealth(hp);
+						} else {
+							if (_replicatedCharacters.TryGetValue(id, out GameObject go)) {
+								go.GetComponent<HealthDisplay>().SetHealth(hp);
+							} else {
+								Debug.LogError($"존재하지 않는 플레이어 ID {id} 의 패킷을 받았습니다!");
+							}
+						}
+					}
 					break;
 				}
 
@@ -216,6 +230,15 @@ namespace ArrowGame.Client {
 					break;
 				}
 			}
+		}
+
+		public void HitByArrow() {
+			if (_localPlayerID == NOT_ASSIGNED_ID) {
+				Debug.LogError("아직 플레이어 ID가 할당되지 않았습니다!");
+				return;
+			}
+
+			SendPacket(new ClientArrowHitPacket(_localPlayerID));
 		}
 	}
 }
