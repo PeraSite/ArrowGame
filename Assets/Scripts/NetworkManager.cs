@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
@@ -41,6 +42,10 @@ namespace ArrowGame.Client {
 		[Header("화살")]
 		[SerializeField] private Arrow _arrowPrefab;
 		[SerializeField] private float _arrowSpawnY;
+
+		[Header("엔딩")]
+		[SerializeField] private EndingPanel _endingPanel;
+
 
 #region Unity Lifecycle
 		private void Awake() {
@@ -191,6 +196,12 @@ namespace ArrowGame.Client {
 
 				case ServerRoomStatusPacket packet: {
 					RoomState = packet.State;
+
+					if (RoomState == RoomState.Ending) {
+						var winnerId = packet.PlayerHp.OrderByDescending(x => x.Value).First().Key;
+						var isWinner = winnerId == _localPlayerID;
+						_endingPanel.ShowPanel(isWinner ? "YOU WIN!" : "YOU LOSE!");
+					}
 
 					if (_localPlayerID == NOT_ASSIGNED_ID) break;
 
