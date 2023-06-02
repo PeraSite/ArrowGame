@@ -38,6 +38,10 @@ namespace ArrowGame.Client {
 		[SerializeField] private Vector2 _spawnLocation;
 		private Dictionary<int, GameObject> _replicatedCharacters;
 
+		[Header("화살")]
+		[SerializeField] private Arrow _arrowPrefab;
+		[SerializeField] private float _arrowSpawnY;
+
 #region Unity Lifecycle
 		private void Awake() {
 			// Singleton 로직
@@ -176,7 +180,7 @@ namespace ArrowGame.Client {
 					if (_localPlayerID == packet.PlayerId) return;
 
 					if (_replicatedCharacters.TryGetValue(packet.PlayerId, out GameObject go)) {
-						// 이미 존재하는 플레이어 ID의 패킷을 받았을 때
+						//이미 존재하는 플레이어 ID의 패킷을 받았을 때
 						Destroy(go);
 						_replicatedCharacters.Remove(packet.PlayerId);
 					} else {
@@ -203,6 +207,12 @@ namespace ArrowGame.Client {
 						Debug.LogError($"존재하지 않는 플레이어 ID {packet.PlayerId} 의 패킷을 받았습니다!");
 					}
 
+					break;
+				}
+
+				case ServerArrowSpawnPacket packet: {
+					var arrow = Instantiate(_arrowPrefab, new Vector3(packet.X, _arrowSpawnY, 0), Quaternion.identity);
+					arrow.Init(packet.Speed);
 					break;
 				}
 			}

@@ -5,15 +5,17 @@ namespace ArrowGame.Client {
 		[Header("Movement")]
 		[SerializeField] private float _moveSpeed;
 
+		private Rigidbody2D _rigidbody;
 		private IInputProvider _provider;
 
 		private void Awake() {
 			_provider = GetComponent<IInputProvider>();
+			_rigidbody = GetComponent<Rigidbody2D>();
 		}
 
 		private void Update() {
 			var state = _provider.GetState();
-			transform.position += new Vector3(state.HorizontalMovement * _moveSpeed * Time.deltaTime, 0, 0);
+			_rigidbody.velocity = new Vector3(state.HorizontalMovement * _moveSpeed, 0, 0);
 		}
 	}
 }

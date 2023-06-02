@@ -324,6 +324,8 @@ MonoBehaviour:
   _localIdDisplay: {fileID: 2023306484}
   _replicatedCharacterPrefab: {fileID: 5354581025625979334, guid: 5b190f581509c0749a99dba6c59cffdb, type: 3}
   _spawnLocation: {x: 0, y: -3.86}
+  _arrowPrefab: {fileID: 2053751706822115275, guid: cf3d6c72b29de9b489887d882902eb5c, type: 3}
+  _arrowSpawnY: 4.5
 --- !u!4 &557511484
 Transform:
   m_ObjectHideFlags: 0
@@ -524,9 +526,11 @@ GameObject:
   - component: {fileID: 2023306482}
   - component: {fileID: 2023306484}
   - component: {fileID: 2023306485}
+  - component: {fileID: 2023306486}
+  - component: {fileID: 2023306487}
   m_Layer: 0
   m_Name: Player
-  m_TagString: Untagged
+  m_TagString: Player
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -611,7 +615,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c58a68d1f63240ee843589c19e80897a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _moveSpeed: 3
+  _moveSpeed: 5
 --- !u!114 &2023306484
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -638,3 +642,50 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _networkManager: {fileID: 557511483}
+--- !u!61 &2023306486
+BoxCollider2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2023306479}
+  m_Enabled: 1
+  m_Density: 1
+  m_Material: {fileID: 0}
+  m_IsTrigger: 1
+  m_UsedByEffector: 0
+  m_UsedByComposite: 0
+  m_Offset: {x: 0, y: 0}
+  m_SpriteTilingProperty:
+    border: {x: 0, y: 0, z: 0, w: 0}
+    pivot: {x: 0.5, y: 0.5}
+    oldSize: {x: 1.78, y: 1.9}
+    newSize: {x: 1.78, y: 1.9}
+    adaptiveTilingThreshold: 0.5
+    drawMode: 0
+    adaptiveTiling: 0
+  m_AutoTiling: 0
+  serializedVersion: 2
+  m_Size: {x: 1.78, y: 1.9}
+  m_EdgeRadius: 0
+--- !u!50 &2023306487
+Rigidbody2D:
+  serializedVersion: 4
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2023306479}
+  m_BodyType: 0
+  m_Simulated: 1
+  m_UseFullKinematicContacts: 0
+  m_UseAutoMass: 0
+  m_Mass: 1
+  m_LinearDrag: 0
+  m_AngularDrag: 0
+  m_GravityScale: 0
+  m_Material: {fileID: 0}
+  m_Interpolate: 0
+  m_SleepingMode: 1
+  m_CollisionDetection: 0
+  m_Constraints: 4
