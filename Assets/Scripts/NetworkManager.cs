@@ -98,6 +98,7 @@ namespace ArrowGame.Client {
 
 		private void SendInputState(InputState state) {
 			if (_localPlayerID == -1) return;
+			if (RoomState != RoomState.Playing) return;
 
 			SendPacket(new PlayerInputPacket(_localPlayerID, state));
 		}
@@ -183,8 +184,6 @@ namespace ArrowGame.Client {
 						//이미 존재하는 플레이어 ID의 패킷을 받았을 때
 						Destroy(go);
 						_replicatedCharacters.Remove(packet.PlayerId);
-					} else {
-						Debug.LogError($"존재하지 않는 플레이어 ID {packet.PlayerId} 의 패킷을 받았습니다!");
 					}
 
 					break;
@@ -198,11 +197,11 @@ namespace ArrowGame.Client {
 					foreach (var (id, hp) in packet.PlayerHp) {
 						if (id == _localPlayerID) {
 							_localHealthDisplay.SetHealth(hp);
+							Debug.Log($"Setting local player health to {hp}");
 						} else {
 							if (_replicatedCharacters.TryGetValue(id, out GameObject go)) {
 								go.GetComponent<HealthDisplay>().SetHealth(hp);
-							} else {
-								Debug.LogError($"존재하지 않는 플레이어 ID {id} 의 패킷을 받았습니다!");
+								Debug.Log($"Setting replicated player {id} health to {hp}", go);
 							}
 						}
 					}
@@ -213,18 +212,20 @@ namespace ArrowGame.Client {
 					// 자신의 아이디와 같은 패킷이라면 무시
 					if (packet.PlayerId == _localPlayerID) return;
 
+					if (RoomState != RoomState.Playing) return;
+
 					if (_replicatedCharacters.TryGetValue(packet.PlayerId, out GameObject go)) {
 						// 이미 존재하는 플레이어 ID의 패킷을 받았을 때
 						var networkInputProvider = go.GetComponent<NetworkInputProvider>();
 						networkInputProvider.LastReceivedState = packet.State;
-					} else {
-						Debug.LogError($"존재하지 않는 플레이어 ID {packet.PlayerId} 의 패킷을 받았습니다!");
 					}
 
 					break;
 				}
 
 				case ServerArrowSpawnPacket packet: {
+					if (RoomState != RoomState.Playing) return;
+
 					var arrow = Instantiate(_arrowPrefab, new Vector3(packet.X, _arrowSpawnY, 0), Quaternion.identity);
 					arrow.Init(packet.Speed);
 					break;

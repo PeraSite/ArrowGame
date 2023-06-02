@@ -23,6 +23,8 @@ namespace ArrowGame.Client {
 			if (other.CompareTag("Player")) {
 				Destroy(gameObject);
 				NetworkManager.Instance.HitByArrow();
+			} else if (other.CompareTag("Replicated")) {
+				Destroy(gameObject);
 			}
 		}
 	}
