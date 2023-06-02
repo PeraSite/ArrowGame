@@ -2,7 +2,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace ArrowGame.Client {
+namespace ArrowGame.Client.UI {
 	public class HealthDisplay : MonoBehaviour {
 		[SerializeField] private float _maxHealth = 100f;
 		[SerializeField] private Image _barImage;

@@ -1,8 +1,7 @@
-﻿using System;
-using TMPro;
+﻿using TMPro;
 using UnityEngine;
 
-namespace ArrowGame.Client {
+namespace ArrowGame.Client.UI {
 	public class EndingPanel : MonoBehaviour {
 		[SerializeField] private GameObject _endingPanel;
 		[SerializeField] private TextMeshProUGUI _winnerText;

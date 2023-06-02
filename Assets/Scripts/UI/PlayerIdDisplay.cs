@@ -1,7 +1,7 @@
 ﻿using TMPro;
 using UnityEngine;
 
-namespace ArrowGame.Client {
+namespace ArrowGame.Client.UI {
 	public class PlayerIdDisplay : MonoBehaviour {
 		[SerializeField] private TextMeshPro _text;
 

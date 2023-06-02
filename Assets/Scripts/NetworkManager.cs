@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
+using ArrowGame.Client.UI;
 using ArrowGame.Common;
 using ArrowGame.Common.Extensions;
 using ArrowGame.Common.Packets.Client;
