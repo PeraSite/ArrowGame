@@ -765,7 +765,7 @@ MonoBehaviour:
   _spawnLocation: {x: 0, y: -3.86}
   _arrowPrefab: {fileID: 2053751706822115275, guid: cf3d6c72b29de9b489887d882902eb5c, type: 3}
   _arrowSpawnY: 4.5
-  _endingPanel: {fileID: 0}
+  _endingPanel: {fileID: 2105538497}
 --- !u!4 &557511484
 Transform:
   m_ObjectHideFlags: 0
@@ -1764,4 +1764,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0339665366d34ee9883c273609f0ed81, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _infoText: {fileID: 0}
+  _infoText: {fileID: 1954026730}
