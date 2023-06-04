@@ -18,11 +18,17 @@ namespace ArrowGame.Client {
 		public static NetworkManager Instance { get; private set; }
 		public event Action<IPacket> OnPacketReceived;
 
-		// TCP 통신 오브젝트
-		private TcpClient _client;
-		private NetworkStream _stream;
-		private BinaryReader _reader;
-		private BinaryWriter _writer;
+		[Header("네트워킹 관련")]
+		[SerializeField] private string _ip = "127.0.0.1";
+		[SerializeField] private int _tcpPort = 9000;
+		[SerializeField] private int _udpPort = 9001;
+
+		private TcpClient _tcpClient;
+		private NetworkStream _tcpStream;
+		private BinaryReader _tcpReader;
+		private BinaryWriter _tcpWriter;
+		private UdpClient _udpClient;
+
 		private ConcurrentQueue<IPacket> _packetQueue;
 
 		public RoomState RoomState { get; private set; }
@@ -33,7 +39,8 @@ namespace ArrowGame.Client {
 		[SerializeField] private PlayerIdDisplay _localIdDisplay;
 		private InputState _lastState;
 		private const int NOT_ASSIGNED_ID = -999;
-		private int _localPlayerID;
+		private int _localPlayerId;
+		private Guid _localClientId;
 
 		[Header("타 플레이어")]
 		[SerializeField] private GameObject _replicatedCharacterPrefab;
@@ -59,21 +66,25 @@ namespace ArrowGame.Client {
 			DontDestroyOnLoad(gameObject);
 
 			// 변수 초기화
-			_client = new TcpClient();
+			_tcpClient = new TcpClient();
+			_udpClient = new UdpClient();
+
 			_packetQueue = new ConcurrentQueue<IPacket>();
 			_replicatedCharacters = new Dictionary<int, GameObject>();
 
-			_localPlayerID = NOT_ASSIGNED_ID;
+			_localPlayerId = NOT_ASSIGNED_ID;
 			RoomState = RoomState.Waiting;
 
 			JoinServer();
 		}
 
 		private void OnDestroy() {
-			_client?.Dispose();
-			_stream?.Dispose();
-			_reader?.Dispose();
-			_writer?.Dispose();
+			_tcpReader.Close();
+			_tcpWriter.Close();
+			_tcpStream.Close();
+
+			_tcpClient.Close();
+			_udpClient.Close();
 		}
 
 		[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -103,37 +114,41 @@ namespace ArrowGame.Client {
 		}
 
 		private void SendInputState(InputState state) {
-			if (_localPlayerID == -1) return;
+			if (_localPlayerId == -1) return;
 			if (RoomState != RoomState.Playing) return;
 
-			SendPacket(new PlayerInputPacket(_localPlayerID, state));
+			SendUdpPacket(new PlayerInputPacket(_localPlayerId, state));
 		}
   #endregion
 
 		private void JoinServer() {
-			if (_client.Connected) {
+			if (_tcpClient.Connected) {
 				Debug.Log("Can't join twice!");
 				return;
 			}
 
-			_client.Connect(IPAddress.Loopback, 9000);
-			_stream = _client.GetStream();
-			_writer = new BinaryWriter(_stream);
-			_reader = new BinaryReader(_stream);
+			_tcpClient.Connect(IPAddress.Parse(_ip), _tcpPort);
+			_tcpStream = _tcpClient.GetStream();
+			_tcpWriter = new BinaryWriter(_tcpStream);
+			_tcpReader = new BinaryReader(_tcpStream);
 
-			SendPacket(new ClientPingPacket());
+			_udpClient.Connect(IPAddress.Parse(_ip), _udpPort);
 
-			var listenThread = new Thread(() => {
-				while (_client.Connected) {
-					if (!_stream.CanRead) continue;
-					if (!_stream.CanWrite) continue;
-					if (!_client.Connected) {
+			_localClientId = Guid.NewGuid();
+
+			SendPacket(new ClientPingPacket(_localClientId));
+
+			var tcpThread = new Thread(() => {
+				while (_tcpClient.Connected) {
+					if (!_tcpStream.CanRead) continue;
+					if (!_tcpStream.CanWrite) continue;
+					if (!_tcpClient.Connected) {
 						Debug.Log("Disconnected!");
 						break;
 					}
 
 					try {
-						var packetID = _reader.BaseStream.ReadByte();
+						var packetID = _tcpReader.BaseStream.ReadByte();
 
 						// 읽을 수 없다면(데이터가 끝났다면 리턴)
 						if (packetID == -1) break;
@@ -141,7 +156,7 @@ namespace ArrowGame.Client {
 						var packetType = (PacketType)packetID;
 
 						// 타입에 맞는 패킷 객체 생성 후 큐에 추가
-						var basePacket = packetType.CreatePacket(_reader);
+						var basePacket = packetType.CreatePacket(_tcpReader);
 						_packetQueue.Enqueue(basePacket);
 					}
 					catch (Exception) {
@@ -149,17 +164,60 @@ namespace ArrowGame.Client {
 					}
 				}
 			});
-			listenThread.Start();
+			tcpThread.Start();
+
+
+			var udpThread = new Thread(() => {
+				while (true) {
+					try {
+						IPEndPoint remote = new IPEndPoint(IPAddress.Any, 0);
+						var received = _udpClient.Receive(ref remote);
+
+						// 아무것도 받지 않았다면 무시
+						if (received.Length == 0) continue;
+
+						using var ms = new MemoryStream(received);
+						using var br = new BinaryReader(ms);
+
+						var packetID = br.ReadByte();
+						var packetType = (PacketType)packetID;
+
+						// 타입에 맞는 패킷 객체 생성 후 큐에 추가
+						var basePacket = packetType.CreatePacket(_tcpReader);
+						_packetQueue.Enqueue(basePacket);
+					}
+					catch (Exception) {
+						break;
+					}
+				}
+			});
+			udpThread.Start();
+
 		}
 
 		private void SendPacket(IPacket packet) {
-			if (!_client.Connected) {
+			if (!_tcpClient.Connected) {
 				Debug.LogError("서버에 연결되지 않았습니다!");
 				return;
 			}
+			Debug.Log($"[TCP] [C -> S] {packet}");
 
-			Debug.Log($"[C -> S] {packet}");
-			_writer.Write(packet);
+			_tcpWriter.Write(packet);
+		}
+
+		private void SendUdpPacket(IPacket packet) {
+			Debug.Log($"[UDP] [C -> S] {packet}");
+			using var ms = new MemoryStream();
+			using var bw = new BinaryWriter(ms);
+
+			// 패킷 직렬화
+			bw.Write((byte)packet.Type);
+			bw.Write(_localClientId);
+			packet.Serialize(bw);
+
+			// 전송
+			var bytes = ms.ToArray();
+			_udpClient.Send(bytes, bytes.Length);
 		}
 
 		private void HandlePacket(IPacket incomingPacket) {
@@ -167,14 +225,14 @@ namespace ArrowGame.Client {
 			switch (incomingPacket) {
 				case ServerAssignPlayerIdPacket packet: {
 					// 전달받은 Player ID 할당
-					_localPlayerID = packet.PlayerId;
-					_localIdDisplay.Init(_localPlayerID);
+					_localPlayerId = packet.PlayerId;
+					_localIdDisplay.Init(_localPlayerId);
 					break;
 				}
 
 				case ServerRoomJoinPacket packet: {
 					// 자신의 아이디와 같은 패킷이라면 무시
-					if (_localPlayerID == packet.PlayerId) return;
+					if (_localPlayerId == packet.PlayerId) return;
 
 					var instantiated = Instantiate(_replicatedCharacterPrefab, _spawnLocation, Quaternion.identity);
 					_replicatedCharacters.Add(packet.PlayerId, instantiated);
@@ -184,7 +242,7 @@ namespace ArrowGame.Client {
 
 				case ServerRoomQuitPacket packet: {
 					// 자신의 아이디와 같은 패킷이라면 무시
-					if (_localPlayerID == packet.PlayerId) return;
+					if (_localPlayerId == packet.PlayerId) return;
 
 					if (_replicatedCharacters.TryGetValue(packet.PlayerId, out GameObject go)) {
 						//이미 존재하는 플레이어 ID의 패킷을 받았을 때
@@ -200,14 +258,14 @@ namespace ArrowGame.Client {
 
 					if (RoomState == RoomState.Ending) {
 						var winnerId = packet.PlayerHp.OrderByDescending(x => x.Value).First().Key;
-						var isWinner = winnerId == _localPlayerID;
+						var isWinner = winnerId == _localPlayerId;
 						_endingPanel.ShowPanel(isWinner ? "YOU WIN!" : "YOU LOSE!");
 					}
 
-					if (_localPlayerID == NOT_ASSIGNED_ID) break;
+					if (_localPlayerId == NOT_ASSIGNED_ID) break;
 
 					foreach (var (id, hp) in packet.PlayerHp) {
-						if (id == _localPlayerID) {
+						if (id == _localPlayerId) {
 							_localHealthDisplay.SetHealth(hp);
 							Debug.Log($"Setting local player health to {hp}");
 						} else {
@@ -222,7 +280,7 @@ namespace ArrowGame.Client {
 
 				case PlayerInputPacket packet: {
 					// 자신의 아이디와 같은 패킷이라면 무시
-					if (packet.PlayerId == _localPlayerID) return;
+					if (packet.PlayerId == _localPlayerId) return;
 
 					if (RoomState != RoomState.Playing) return;
 
@@ -246,12 +304,12 @@ namespace ArrowGame.Client {
 		}
 
 		public void HitByArrow() {
-			if (_localPlayerID == NOT_ASSIGNED_ID) {
+			if (_localPlayerId == NOT_ASSIGNED_ID) {
 				Debug.LogError("아직 플레이어 ID가 할당되지 않았습니다!");
 				return;
 			}
 
-			SendPacket(new ClientArrowHitPacket(_localPlayerID));
+			SendPacket(new ClientArrowHitPacket(_localPlayerId));
 		}
 	}
 }
